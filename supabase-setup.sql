@@ -1,24 +1,32 @@
--- Jalankan di Supabase → SQL Editor → Run (sekali saja).
--- Tabel ini menyimpan jurnal; satu baris per trade.
+-- Setup Supabase: jurnal pribadi dengan login + RLS.
+-- Jalankan sekali di Supabase -> SQL Editor -> Run.
+--
+-- PENTING: kalau kamu pernah menjalankan versi SQL lama (tanpa user_id),
+-- hapus dulu tabelnya dengan menghapus tanda komentar di baris berikut.
+-- Ini menghapus semua data di tabel journal.
+-- drop table if exists public.journal;
 
 create table if not exists public.journal (
-  id          text primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  id          text not null,
   updated_at  bigint not null default 0,
   deleted     boolean not null default false,
-  payload     jsonb not null
+  payload     jsonb not null,
+  primary key (user_id, id)
 );
 
--- Akses dari app (anon key). Baca peringatan di bawah.
 alter table public.journal enable row level security;
 
+-- buang policy lama yang terbuka (kalau ada)
 drop policy if exists "journal anon all" on public.journal;
-create policy "journal anon all" on public.journal
-  for all
-  to anon
-  using (true)
-  with check (true);
+drop policy if exists "journal own rows" on public.journal;
 
--- PERINGATAN
--- Siapa pun yang memiliki Project URL + anon key dapat membaca/menulis tabel ini.
--- Jangan simpan informasi sensitif. Untuk pemakaian pribadi, ini setara
--- "URL rahasia" — jangan publikasikan URL project-mu.
+-- hanya pemilik baris yang bisa baca/tulis
+create policy "journal own rows" on public.journal
+  for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+revoke all on public.journal from anon;
+grant select, insert, update, delete on public.journal to authenticated;

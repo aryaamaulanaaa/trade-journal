@@ -158,26 +158,27 @@
   </div>
 
   <details id="syncBox">
-    <summary>Sinkron laptop ↔ HP (opsional, sekali setup)</summary>
+    <summary>Login &amp; sinkron laptop ↔ HP</summary>
     <div class="form" style="margin-top:10px">
-      <div class="f c6"><label for="sbUrl">Project URL</label><input id="sbUrl" placeholder="https://xxxx.supabase.co" spellcheck="false"></div>
-      <div class="f c6"><label for="sbKey">Anon public key</label><input id="sbKey" placeholder="eyJhbGciOi..." spellcheck="false"></div>
-      <div class="c12">
+      <div id="authOut" style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="f"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="username" placeholder="kamu@email.com" spellcheck="false"></div>
+        <div class="f"><label for="authPass">Password</label><input id="authPass" type="password" autocomplete="current-password" placeholder="min. 6 karakter"></div>
+        <div class="row-actions" style="grid-column:1/-1">
+          <button type="button" id="btnLogin">Masuk</button>
+          <button type="button" class="ghost" id="btnSignup">Daftar</button>
+          <span class="hint" id="authMsg"></span>
+        </div>
+      </div>
+      <div id="authIn" style="grid-column:1/-1" hidden>
         <div class="row-actions">
-          <button type="button" id="btnSyncCfg">Simpan &amp; tes</button>
+          <span class="hint" id="authWho"></span>
           <button type="button" class="ghost" id="btnSyncNow">Sinkron sekarang</button>
-          <button type="button" class="ghost" id="btnSyncOff">Matikan</button>
+          <button type="button" class="danger" id="btnLogout">Keluar</button>
           <span class="hint" id="syncMsg"></span>
         </div>
       </div>
     </div>
-    <ol>
-      <li>Buat project gratis di supabase.com.</li>
-      <li>SQL Editor → tempel isi <span class="mono">supabase-setup.sql</span> → Run.</li>
-      <li>Project Settings → API: copy <b>Project URL</b> dan <b>anon public</b> key ke kolom di atas.</li>
-      <li>Di HP: buka app yang sama, isi dua kolom itu sekali. Selesai — data otomatis menyatu.</li>
-    </ol>
-    <p class="hint" style="margin:8px 0 0">Anon key memang publik untuk client; siapa pun yang tahu URL+key bisa mengakses tabel. Jangan simpan info sensitif. Kalau ragu, pakai mode lokal + export CSV.</p>
+    <p class="hint" style="margin:10px 0 0">Tanpa login, jurnal tetap jalan lokal di browser ini. Login hanya diperlukan untuk sinkron antar perangkat. Setup database: <a href="supabase-setup.sql">supabase-setup.sql</a>.</p>
   </details>
 
   <details>
@@ -216,18 +217,24 @@
     catch (e) { /* file:// sandbox: tetap jalan di memori */ }
   }
 
-  // ---------- sinkronisasi (Supabase REST) ----------
-  const CFG_KEY = 'journal.sync';
-  let cfg = loadCfg();
+  // ---------- auth + sinkronisasi (Supabase) ----------
+  const SB_URL = 'https://vobtplysnpsnqjaoustg.supabase.co';
+  const SB_KEY = 'sb_publishable_mP1Tp9mLX82puTuM890V9w_J6U9E-Pv';
+  const AUTH_KEY = 'journal.auth';
+  let session = loadSession();
   let syncing = false, syncTimer = null;
 
-  function loadCfg() {
-    try { return JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); } catch (e) { return {}; }
+  function loadSession() {
+    try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch (e) { return null; }
   }
-  function saveCfg() {
-    try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
+  function saveSession(s) {
+    session = s;
+    try {
+      if (s) localStorage.setItem(AUTH_KEY, JSON.stringify(s));
+      else localStorage.removeItem(AUTH_KEY);
+    } catch (e) {}
   }
-  const hasCfg = () => !!(cfg.url && cfg.key);
+  const isLoggedIn = () => !!(session && session.access_token);
 
   function setChip(text, cls) {
     const el = $('syncChip');
@@ -236,6 +243,90 @@
     el.className = 'chip ' + (cls || '');
   }
   function msg(text) { const el = $('syncMsg'); if (el) el.textContent = text || ''; }
+  function authMsg(text) { const el = $('authMsg'); if (el) el.textContent = text || ''; }
+
+  async function authCall(path, opts = {}) {
+    const res = await fetch(SB_URL + path, {
+      ...opts,
+      headers: {
+        'apikey': SB_KEY,
+        'Content-Type': 'application/json',
+        ...(opts.headers || {})
+      }
+    });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (e) { data = { raw: text }; }
+    if (!res.ok) {
+      const m = (data && (data.error_description || data.msg || data.message || data.error)) || ('HTTP ' + res.status);
+      throw new Error(m);
+    }
+    return data;
+  }
+
+  function applySession(d) {
+    saveSession({
+      access_token: d.access_token,
+      refresh_token: d.refresh_token,
+      expires_at: d.expires_at || (Math.floor(Date.now() / 1000) + (d.expires_in || 3600)),
+      user: d.user || (session && session.user) || null
+    });
+  }
+
+  async function signIn(email, password) {
+    const d = await authCall('/auth/v1/token?grant_type=password', {
+      method: 'POST', body: JSON.stringify({ email, password })
+    });
+    applySession(d);
+    return d;
+  }
+
+  async function signUp(email, password) {
+    const d = await authCall('/auth/v1/signup', {
+      method: 'POST', body: JSON.stringify({ email, password })
+    });
+    if (d && d.access_token) { applySession(d); return true; }
+    return false;
+  }
+
+  async function refreshSession() {
+    if (!session || !session.refresh_token) throw new Error('sesi habis, masuk lagi');
+    const d = await authCall('/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST', body: JSON.stringify({ refresh_token: session.refresh_token })
+    });
+    applySession(d);
+    return d;
+  }
+
+  async function ensureSession() {
+    if (!isLoggedIn()) throw new Error('belum masuk');
+    if (session.expires_at && session.expires_at - 60 < Math.floor(Date.now() / 1000)) await refreshSession();
+    return session;
+  }
+
+  async function signOut() {
+    try {
+      if (isLoggedIn()) {
+        await fetch(SB_URL + '/auth/v1/logout', {
+          method: 'POST',
+          headers: { apikey: SB_KEY, Authorization: 'Bearer ' + session.access_token }
+        });
+      }
+    } catch (e) {}
+    saveSession(null);
+    setChip('Lokal', '');
+    msg(''); authMsg('');
+    renderAuthUI();
+  }
+
+  function renderAuthUI() {
+    const on = isLoggedIn();
+    const out = $('authOut'), inn = $('authIn');
+    if (out) out.hidden = on;
+    if (inn) inn.hidden = !on;
+    const who = $('authWho');
+    if (who && on) who.textContent = (session.user && session.user.email) || 'masuk';
+  }
 
   function mergeRows(a, b) {
     const map = new Map();
@@ -251,20 +342,37 @@
       (Number(x.updatedAt) || 0) - (Number(y.updatedAt) || 0));
   }
 
+  function sbHeaders(extra) {
+    return {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + session.access_token,
+      'Content-Type': 'application/json',
+      ...(extra || {})
+    };
+  }
+
+  async function sbFetch(path, opts = {}) {
+    const run = () => fetch(SB_URL + path, { ...opts, headers: sbHeaders(opts.headers) });
+    let res = await run();
+    if (res.status === 401) { await refreshSession(); res = await run(); }
+    return res;
+  }
+
   async function syncNow(manual) {
-    if (!hasCfg()) { if (manual) msg('Isi URL dan anon key dulu, lalu "Simpan & tes".'); return; }
+    if (!isLoggedIn()) {
+      if (manual) msg('Masuk dulu untuk sinkron.');
+      setChip('Lokal', '');
+      return;
+    }
     if (syncing) return;
     syncing = true;
     setChip('Sinkron…', 'sync');
     if (manual) msg('Menyinkronkan…');
     try {
-      const base = cfg.url.replace(/\/+$/, '');
-      const h = {
-        'apikey': cfg.key,
-        'Authorization': 'Bearer ' + cfg.key,
-        'Content-Type': 'application/json'
-      };
-      const get = await fetch(base + '/rest/v1/journal?select=id,updated_at,deleted,payload', { headers: h });
+      await ensureSession();
+      const uid = session.user && session.user.id;
+      const q = '/rest/v1/journal?select=id,updated_at,deleted,payload';
+      const get = await sbFetch(q);
       if (!get.ok) throw new Error('GET ' + get.status + ' · ' + (await get.text()).slice(0, 160));
       const remoteRaw = await get.json();
       const remote = remoteRaw.map(x => ({
@@ -275,12 +383,12 @@
       save();
       if (rows.length) {
         const body = rows.map(r => ({
-          id: r.id, updated_at: Number(r.updatedAt) || 0,
+          user_id: uid, id: r.id, updated_at: Number(r.updatedAt) || 0,
           deleted: !!r.deleted, payload: r
         }));
-        const post = await fetch(base + '/rest/v1/journal', {
+        const post = await sbFetch('/rest/v1/journal?on_conflict=user_id,id', {
           method: 'POST',
-          headers: { ...h, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+          headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
           body: JSON.stringify(body)
         });
         if (!post.ok) throw new Error('POST ' + post.status + ' · ' + (await post.text()).slice(0, 160));
@@ -289,7 +397,7 @@
       setChip('Sinkron ✓', 'ok');
       if (manual) msg('Selesai · ' + visible().length + ' trade tersinkron.');
     } catch (err) {
-      setChip('Gagal sync', 'err');
+      setChip(isLoggedIn() ? 'Gagal sync' : 'Lokal', isLoggedIn() ? 'err' : '');
       msg('Gagal: ' + (err && err.message ? err.message : err));
     } finally {
       syncing = false;
@@ -297,7 +405,7 @@
   }
 
   function scheduleSync() {
-    if (!hasCfg()) return;
+    if (!isLoggedIn()) return;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => syncNow(false), 800);
   }
@@ -562,41 +670,60 @@
   ['entry','stop','target','exit'].forEach(id => $(id).addEventListener('input', preview));
   $('dir').addEventListener('change', preview);
 
-  // --- kontrol sinkronisasi ---
-  $('sbUrl').value = cfg.url || '';
-  $('sbKey').value = cfg.key || '';
+  // --- auth & sinkronisasi ---
+  renderAuthUI();
 
-  $('btnSyncCfg').addEventListener('click', async () => {
-    const url = $('sbUrl').value.trim();
-    const key = $('sbKey').value.trim();
-    if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url) && !/^https?:\/\//.test(url)) {
-      msg('URL tidak valid. Contoh: https://abcd.supabase.co'); return;
+  $('btnLogin').addEventListener('click', async () => {
+    const email = $('authEmail').value.trim();
+    const pass = $('authPass').value;
+    if (!email || !pass) { authMsg('Email dan password wajib diisi.'); return; }
+    authMsg('Masuk…');
+    try {
+      await signIn(email, pass);
+      authMsg('');
+      $('authPass').value = '';
+      renderAuthUI();
+      await syncNow(true);
+    } catch (e) {
+      authMsg('Gagal: ' + e.message);
     }
-    if (!key) { msg('Anon key kosong.'); return; }
-    cfg = { url: url.replace(/\/+$/, ''), key };
-    saveCfg();
-    msg('Konfigurasi disimpan. Menguji koneksi…');
-    await syncNow(true);
   });
 
+  $('btnSignup').addEventListener('click', async () => {
+    const email = $('authEmail').value.trim();
+    const pass = $('authPass').value;
+    if (!email || pass.length < 6) { authMsg('Email valid dan password minimal 6 karakter.'); return; }
+    authMsg('Mendaftar…');
+    try {
+      const ok = await signUp(email, pass);
+      if (ok) {
+        authMsg('Akun dibuat dan langsung masuk.');
+        $('authPass').value = '';
+        renderAuthUI();
+        await syncNow(true);
+      } else {
+        authMsg('Cek email untuk konfirmasi, lalu klik Masuk.');
+      }
+    } catch (e) {
+      authMsg('Gagal: ' + e.message);
+    }
+  });
+
+  $('btnLogout').addEventListener('click', signOut);
   $('btnSyncNow').addEventListener('click', () => syncNow(true));
 
-  $('btnSyncOff').addEventListener('click', () => {
-    cfg = {}; saveCfg();
-    $('sbUrl').value = ''; $('sbKey').value = '';
-    setChip('Lokal', '');
-    msg('Sinkron dimatikan. Data tetap lokal.');
-  });
-
-  if (hasCfg()) {
+  if (isLoggedIn()) {
     setChip('Sinkron…', 'sync');
-    setTimeout(() => syncNow(false), 300);
+    setTimeout(async () => {
+      try { await ensureSession(); renderAuthUI(); await syncNow(false); }
+      catch (e) { setChip('Login ulang', 'err'); authMsg('Sesi habis: ' + e.message); renderAuthUI(); }
+    }, 300);
   } else {
     setChip('Lokal', '');
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && hasCfg()) syncNow(false);
+    if (document.visibilityState === 'visible' && isLoggedIn()) syncNow(false);
   });
 
   const now = new Date();
