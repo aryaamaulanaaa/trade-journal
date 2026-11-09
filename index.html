@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f1115">
+<title>Jurnal Trade</title>
+<style>
+  :root{
+    --bg:#0f1115; --surface:#171a21; --surface2:#1e222b; --text:#e8eaed;
+    --muted:#9aa3af; --border:#2a2f3a; --accent:#4f8cff; --green:#3ddc97;
+    --red:#ff6b6b; --amber:#ffb020; --radius:10px;
+    --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f6f7f9; --surface:#ffffff; --surface2:#f0f2f5; --text:#111418;
+      --muted:#5b6470; --border:#dfe3e9; --accent:#2563eb; --green:#0a8f5b;
+      --red:#d92d20; --amber:#b45309;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font)}
+  body{font-size:15px;line-height:1.45;padding:16px;max-width:1240px;margin:0 auto}
+  h1{font-size:18px;margin:0 0 2px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+  .stats{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-bottom:14px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;min-width:0}
+  .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat .v{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .v.pos{color:var(--green)} .v.neg{color:var(--red)} .v.warn{color:var(--amber)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px;font-weight:600}
+  .form{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px}
+  .f{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .f label{font-size:11px;color:var(--muted);letter-spacing:.02em}
+  .f input,.f select,.f textarea{
+    background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:9px 10px;font:inherit;font-size:14px;min-width:0;width:100%
+  }
+  .f input:focus,.f select:focus,.f textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+  .f input[type=number]{font-family:var(--mono)}
+  .c2{grid-column:span 2}.c3{grid-column:span 3}.c4{grid-column:span 4}.c6{grid-column:span 6}.c12{grid-column:span 12}
+  .row-actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  button{
+    background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;
+    font:inherit;font-weight:600;cursor:pointer
+  }
+  button:hover{filter:brightness(1.08)}
+  button.ghost{background:transparent;color:var(--text);border:1px solid var(--border);font-weight:500}
+  button.danger{background:transparent;color:var(--red);border:1px solid var(--border);font-weight:500}
+  .hint{color:var(--muted);font-size:12px}
+  .err{color:var(--red);font-size:12px;min-height:16px}
+  .tablewrap{max-height:52vh;overflow:auto;border:1px solid var(--border);border-radius:8px}
+  table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+  th,td{padding:7px 9px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border)}
+  th{position:sticky;top:0;background:var(--surface2);font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);z-index:1}
+  tbody tr:last-child td{border-bottom:0}
+  td.num{font-family:var(--mono);text-align:right}
+  .tag{display:inline-block;padding:1px 6px;border-radius:5px;font-size:11px;background:var(--surface2);border:1px solid var(--border)}
+  .tag.bad{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,var(--border))}
+  .spark{width:100%;height:64px;display:block}
+  .empty{padding:22px;text-align:center;color:var(--muted);font-size:13px}
+  details{border-top:1px solid var(--border);padding-top:10px;margin-top:10px}
+  summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+  details ol{margin:8px 0 0;padding-left:20px;color:var(--muted);font-size:13px}
+  .mono{font-family:var(--mono)}
+  .chip{display:inline-block;font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted);vertical-align:middle;margin-left:8px;font-weight:500}
+  .chip.ok{color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,var(--border))}
+  .chip.err{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,var(--border))}
+  .chip.sync{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 45%,var(--border))}
+  @media (max-width:900px){
+    .stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .c2,.c3,.c4{grid-column:span 6}
+  }
+  @media (max-width:560px){
+    body{padding:12px}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .c2,.c3,.c4,.c6{grid-column:span 12}
+  }
+</style>
+</head>
+<body>
+  <h1>Jurnal Trade <span class="chip" id="syncChip" title="Status sinkronisasi">Lokal</span></h1>
+  <p class="sub">Satu layar. Isi, simpan (Ctrl/Cmd+Enter). Data tersimpan di browser ini.</p>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card">
+    <h2>Trade baru</h2>
+    <form class="form" id="form" autocomplete="off">
+      <div class="f c2"><label for="date">Tanggal</label><input id="date" name="date" type="date" required></div>
+      <div class="f c2"><label for="session">Sesi</label>
+        <select id="session" name="session">
+          <option>London</option><option>NY</option><option>Asia</option><option>Lain</option>
+        </select>
+      </div>
+      <div class="f c2"><label for="symbol">Pair / Instrumen</label><input id="symbol" name="symbol" placeholder="EURUSD" required></div>
+      <div class="f c2"><label for="dir">Arah</label>
+        <select id="dir" name="dir"><option value="long">Long</option><option value="short">Short</option></select>
+      </div>
+      <div class="f c2"><label for="setup">Setup</label>
+        <input id="setup" name="setup" list="setups" placeholder="SMC-Sweep">
+        <datalist id="setups">
+          <option>SMC-Sweep</option><option>ORB</option><option>Trend pullback</option>
+          <option>Mean reversion</option><option>Liquidity grab</option>
+        </datalist>
+      </div>
+      <div class="f c2"><label for="risk">Risk %</label><input id="risk" name="risk" type="number" step="0.01" min="0" placeholder="0.3"></div>
+
+      <div class="f c3"><label for="entry">Entry</label><input id="entry" name="entry" type="number" step="any" required></div>
+      <div class="f c3"><label for="stop">Stop</label><input id="stop" name="stop" type="number" step="any" required></div>
+      <div class="f c3"><label for="target">Target</label><input id="target" name="target" type="number" step="any"></div>
+      <div class="f c3"><label for="exit">Exit (kosong = masih terbuka)</label><input id="exit" name="exit" type="number" step="any"></div>
+
+      <div class="f c6"><label for="note">Catatan / kesalahan</label><input id="note" name="note" placeholder="sweep valid, entry agak telat"></div>
+      <div class="f c3"><label>&nbsp;</label>
+        <label class="hint" style="display:flex;gap:8px;align-items:center;padding:9px 2px">
+          <input id="broken" name="broken" type="checkbox" style="width:auto"> Melanggar aturan
+        </label>
+      </div>
+      <div class="f c3"><label>R otomatis</label><div class="mono" id="rpreview" style="padding:9px 10px">—</div></div>
+
+      <div class="c12">
+        <div class="row-actions">
+          <button type="submit">Simpan</button>
+          <button type="button" class="ghost" id="btnExport">Export CSV</button>
+          <button type="button" class="ghost" id="btnImport">Import CSV</button>
+          <button type="button" class="danger" id="btnClear">Hapus semua</button>
+          <input type="file" id="file" accept=".csv,text/csv" hidden>
+          <span class="hint">Ctrl/Cmd+Enter simpan · Esc bersihkan form</span>
+        </div>
+        <div class="err" id="err"></div>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Equity (R kumulatif)</h2>
+    <svg class="spark" id="spark" viewBox="0 0 600 64" preserveAspectRatio="none" aria-label="kurva R kumulatif"></svg>
+  </div>
+
+  <div class="card">
+    <h2 style="display:flex;justify-content:space-between;align-items:center">
+      <span>Trades</span><span class="hint" id="count"></span>
+    </h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Tanggal</th><th>Sesi</th><th>Pair</th><th>Arah</th><th>Setup</th>
+          <th class="num">Entry</th><th class="num">Stop</th><th class="num">Exit</th>
+          <th class="num">R</th><th>Aturan</th><th>Catatan</th><th></th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <details id="syncBox">
+    <summary>Sinkron laptop ↔ HP (opsional, sekali setup)</summary>
+    <div class="form" style="margin-top:10px">
+      <div class="f c6"><label for="sbUrl">Project URL</label><input id="sbUrl" placeholder="https://xxxx.supabase.co" spellcheck="false"></div>
+      <div class="f c6"><label for="sbKey">Anon public key</label><input id="sbKey" placeholder="eyJhbGciOi..." spellcheck="false"></div>
+      <div class="c12">
+        <div class="row-actions">
+          <button type="button" id="btnSyncCfg">Simpan &amp; tes</button>
+          <button type="button" class="ghost" id="btnSyncNow">Sinkron sekarang</button>
+          <button type="button" class="ghost" id="btnSyncOff">Matikan</button>
+          <span class="hint" id="syncMsg"></span>
+        </div>
+      </div>
+    </div>
+    <ol>
+      <li>Buat project gratis di supabase.com.</li>
+      <li>SQL Editor → tempel isi <span class="mono">supabase-setup.sql</span> → Run.</li>
+      <li>Project Settings → API: copy <b>Project URL</b> dan <b>anon public</b> key ke kolom di atas.</li>
+      <li>Di HP: buka app yang sama, isi dua kolom itu sekali. Selesai — data otomatis menyatu.</li>
+    </ol>
+    <p class="hint" style="margin:8px 0 0">Anon key memang publik untuk client; siapa pun yang tahu URL+key bisa mengakses tabel. Jangan simpan info sensitif. Kalau ragu, pakai mode lokal + export CSV.</p>
+  </details>
+
+  <details>
+    <summary>Cara pakai (3 baris)</summary>
+    <ol>
+      <li>Isi tanggal, pair, arah, entry, stop. Target opsional. Exit diisi saat trade selesai.</li>
+      <li>R dihitung otomatis: (exit − entry) / (entry − stop), dibalik untuk short.</li>
+      <li>Centang "melanggar aturan" setiap kali kamu tidak mengikuti rencana. Itu metrik paling penting.</li>
+    </ol>
+  </details>
+
+<script>
+(() => {
+  const KEY = 'journal.v1';
+  const $ = (id) => document.getElementById(id);
+  const money = (n) => (n >= 0 ? '+' : '') + n.toFixed(2) + 'R';
+
+  let rows = load();
+  const visible = () => rows.filter(r => !r.deleted);
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return [];
+      const data = JSON.parse(raw);
+      if (!Array.isArray(data)) return [];
+      return data.map(r => ({
+        ...r,
+        updatedAt: Number(r.updatedAt) || 0,
+        deleted: !!r.deleted
+      }));
+    } catch (e) { return []; }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(rows)); }
+    catch (e) { /* file:// sandbox: tetap jalan di memori */ }
+  }
+
+  // ---------- sinkronisasi (Supabase REST) ----------
+  const CFG_KEY = 'journal.sync';
+  let cfg = loadCfg();
+  let syncing = false, syncTimer = null;
+
+  function loadCfg() {
+    try { return JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function saveCfg() {
+    try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
+  }
+  const hasCfg = () => !!(cfg.url && cfg.key);
+
+  function setChip(text, cls) {
+    const el = $('syncChip');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'chip ' + (cls || '');
+  }
+  function msg(text) { const el = $('syncMsg'); if (el) el.textContent = text || ''; }
+
+  function mergeRows(a, b) {
+    const map = new Map();
+    for (const r of [...a, ...b]) {
+      if (!r || !r.id) continue;
+      const cur = map.get(r.id);
+      if (!cur) { map.set(r.id, r); continue; }
+      const ua = Number(cur.updatedAt) || 0, ub = Number(r.updatedAt) || 0;
+      if (ub > ua || (ub === ua && r.deleted && !cur.deleted)) map.set(r.id, r);
+    }
+    return [...map.values()].sort((x, y) =>
+      String(x.date || '').localeCompare(String(y.date || '')) ||
+      (Number(x.updatedAt) || 0) - (Number(y.updatedAt) || 0));
+  }
+
+  async function syncNow(manual) {
+    if (!hasCfg()) { if (manual) msg('Isi URL dan anon key dulu, lalu "Simpan & tes".'); return; }
+    if (syncing) return;
+    syncing = true;
+    setChip('Sinkron…', 'sync');
+    if (manual) msg('Menyinkronkan…');
+    try {
+      const base = cfg.url.replace(/\/+$/, '');
+      const h = {
+        'apikey': cfg.key,
+        'Authorization': 'Bearer ' + cfg.key,
+        'Content-Type': 'application/json'
+      };
+      const get = await fetch(base + '/rest/v1/journal?select=id,updated_at,deleted,payload', { headers: h });
+      if (!get.ok) throw new Error('GET ' + get.status + ' · ' + (await get.text()).slice(0, 160));
+      const remoteRaw = await get.json();
+      const remote = remoteRaw.map(x => ({
+        ...(x.payload || {}), id: x.id,
+        updatedAt: Number(x.updated_at) || 0, deleted: !!x.deleted
+      }));
+      rows = mergeRows(rows, remote);
+      save();
+      if (rows.length) {
+        const body = rows.map(r => ({
+          id: r.id, updated_at: Number(r.updatedAt) || 0,
+          deleted: !!r.deleted, payload: r
+        }));
+        const post = await fetch(base + '/rest/v1/journal', {
+          method: 'POST',
+          headers: { ...h, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(body)
+        });
+        if (!post.ok) throw new Error('POST ' + post.status + ' · ' + (await post.text()).slice(0, 160));
+      }
+      render();
+      setChip('Sinkron ✓', 'ok');
+      if (manual) msg('Selesai · ' + visible().length + ' trade tersinkron.');
+    } catch (err) {
+      setChip('Gagal sync', 'err');
+      msg('Gagal: ' + (err && err.message ? err.message : err));
+    } finally {
+      syncing = false;
+    }
+  }
+
+  function scheduleSync() {
+    if (!hasCfg()) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncNow(false), 800);
+  }
+
+  function calcR(dir, entry, stop, exit) {
+    if (![dir, entry, stop, exit].every(v => v !== '' && v !== null && v !== undefined)) return null;
+    const e = +entry, s = +stop, x = +exit;
+    if (!isFinite(e) || !isFinite(s) || !isFinite(x)) return null;
+    const risk = dir === 'long' ? e - s : s - e;
+    if (!(risk > 0)) return null;
+    const reward = dir === 'long' ? x - e : e - x;
+    return reward / risk;
+  }
+  function plannedR(dir, entry, stop, target) {
+    if ([dir, entry, stop, target].some(v => v === '' || v === null || v === undefined)) return null;
+    const e = +entry, s = +stop, t = +target;
+    const risk = dir === 'long' ? e - s : s - e;
+    const reward = dir === 'long' ? t - e : e - t;
+    if (!(risk > 0) || !isFinite(reward)) return null;
+    return reward / risk;
+  }
+
+  const fmt = (n, d = 2) => (n === null || !isFinite(n)) ? '—' : n.toFixed(d);
+
+  function stats() {
+    const live = visible();
+    const closed = live.filter(r => typeof r.r === 'number' && isFinite(r.r));
+    const n = closed.length;
+    if (!n) return null;
+    const wins = closed.filter(r => r.r > 0);
+    const losses = closed.filter(r => r.r < 0);
+    const sum = closed.reduce((a, r) => a + r.r, 0);
+    const grossWin = wins.reduce((a, r) => a + r.r, 0);
+    const grossLoss = Math.abs(losses.reduce((a, r) => a + r.r, 0));
+    const exp = sum / n;
+    const pf = grossLoss === 0 ? (grossWin > 0 ? Infinity : 0) : grossWin / grossLoss;
+    let peak = 0, eq = 0, maxDD = 0, streak = 0, maxStreak = 0;
+    for (const r of closed) {
+      eq += r.r;
+      if (eq > peak) peak = eq;
+      const dd = peak - eq;
+      if (dd > maxDD) maxDD = dd;
+      if (r.r < 0) { streak++; maxStreak = Math.max(maxStreak, streak); } else streak = 0;
+    }
+    const broken = live.filter(r => r.broken).length;
+    const adherence = live.length ? (1 - broken / live.length) * 100 : 100;
+    return { n, wr: wins.length / n * 100, exp, pf, maxDD, sum, broken, adherence, maxStreak, closed };
+  }
+
+  function renderStats() {
+    const s = stats();
+    const el = $('stats');
+    if (!s) {
+      el.innerHTML = ['Trades','Win rate','Expectancy','Profit factor','Max DD','R total','Aturan']
+        .map(k => `<div class="stat"><div class="k">${k}</div><div class="v">—</div></div>`).join('');
+      return;
+    }
+    const cells = [
+      ['Trades', String(s.n), ''],
+      ['Win rate', s.wr.toFixed(0) + '%', s.wr >= 45 ? 'pos' : (s.wr >= 35 ? '' : 'neg')],
+      ['Expectancy', fmt(s.exp) + 'R', s.exp > 0 ? 'pos' : 'neg'],
+      ['Profit factor', isFinite(s.pf) ? s.pf.toFixed(2) : '∞', s.pf >= 1.25 ? 'pos' : 'neg'],
+      ['Max DD', '-' + s.maxDD.toFixed(2) + 'R', s.maxDD <= 10 ? '' : 'warn'],
+      ['R total', money(s.sum), s.sum >= 0 ? 'pos' : 'neg'],
+      ['Aturan', s.adherence.toFixed(0) + '%', s.adherence >= 90 ? 'pos' : 'warn'],
+    ];
+    el.innerHTML = cells.map(([k, v, c]) => `<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
+  }
+
+  function renderSpark() {
+    const closed = visible().filter(r => typeof r.r === 'number' && isFinite(r.r));
+    const svg = $('spark');
+    if (closed.length < 2) { svg.innerHTML = ''; return; }
+    let eq = 0; const pts = [0];
+    for (const r of closed) { eq += r.r; pts.push(eq); }
+    const min = Math.min(0, ...pts), max = Math.max(0, ...pts);
+    const W = 600, H = 64, pad = 4;
+    const x = i => (i / (pts.length - 1)) * W;
+    const y = v => H - pad - ((v - min) / (max - min || 1)) * (H - pad * 2);
+    const d = pts.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const zeroY = y(0).toFixed(1);
+    const last = pts[pts.length - 1];
+    const col = last >= 0 ? 'var(--green)' : 'var(--red)';
+    svg.innerHTML =
+      `<line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="var(--border)" stroke-width="1"/>` +
+      `<path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
+  }
+
+  function renderTable() {
+    const tb = $('tbody');
+    const live = visible();
+    const list = [...live].reverse();
+    $('count').textContent = live.length ? `${live.length} tercatat · ${live.filter(r => typeof r.r === 'number').length} selesai` : '';
+    if (!list.length) {
+      tb.innerHTML = `<tr><td colspan="12"><div class="empty">Belum ada trade. Isi form di atas, lalu Ctrl/Cmd+Enter.</div></td></tr>`;
+      return;
+    }
+    tb.innerHTML = list.map(r => {
+      const rTxt = (typeof r.r === 'number' && isFinite(r.r)) ? r.r.toFixed(2) : '—';
+      const cls = typeof r.r === 'number' ? (r.r > 0 ? 'pos' : r.r < 0 ? 'neg' : '') : '';
+      return `<tr>
+        <td>${r.date || ''}</td><td>${r.session || ''}</td><td>${esc(r.symbol || '')}</td>
+        <td>${r.dir || ''}</td><td>${esc(r.setup || '')}</td>
+        <td class="num">${r.entry ?? ''}</td><td class="num">${r.stop ?? ''}</td>
+        <td class="num">${r.exit ?? ''}</td>
+        <td class="num ${cls}">${rTxt}</td>
+        <td>${r.broken ? '<span class="tag bad">ya</span>' : '<span class="tag">tidak</span>'}</td>
+        <td title="${esc(r.note || '')}">${esc(r.note || '')}</td>
+        <td><button type="button" class="ghost" style="padding:2px 8px;font-size:12px" data-del="${r.id}">×</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+  function render() { renderStats(); renderSpark(); renderTable(); }
+
+  function preview() {
+    const dir = $('dir').value, e = $('entry').value, s = $('stop').value, x = $('exit').value, t = $('target').value;
+    const r = calcR(dir, e, s, x);
+    const p = plannedR(dir, e, s, t);
+    let txt = '—';
+    if (r !== null) txt = money(r);
+    if (p !== null) txt += `  (rencana ${p.toFixed(2)}R)`;
+    $('rpreview').textContent = txt;
+    $('rpreview').style.color = r === null ? 'var(--muted)' : (r > 0 ? 'var(--green)' : r < 0 ? 'var(--red)' : 'var(--text)');
+  }
+
+  $('form').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    $('err').textContent = '';
+    const dir = $('dir').value;
+    const entry = $('entry').value, stop = $('stop').value;
+    const exit = $('exit').value;
+    const r = calcR(dir, entry, stop, exit);
+    if (exit !== '' && r === null) {
+      $('err').textContent = 'Entry/stop/exit tidak valid: stop harus di sisi berlawanan dan risk > 0.';
+      return;
+    }
+    const row = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      date: $('date').value || new Date().toISOString().slice(0, 10),
+      session: $('session').value,
+      symbol: $('symbol').value.trim().toUpperCase(),
+      dir,
+      setup: $('setup').value.trim(),
+      entry: entry === '' ? null : +entry,
+      stop: stop === '' ? null : +stop,
+      target: $('target').value === '' ? null : +$('target').value,
+      exit: exit === '' ? null : +exit,
+      risk: $('risk').value === '' ? null : +$('risk').value,
+      r: r,
+      broken: $('broken').checked,
+      note: $('note').value.trim(),
+      updatedAt: Date.now(),
+      deleted: false,
+    };
+    rows.push(row);
+    save(); render(); scheduleSync();
+    // pertahankan tanggal & sesi, bersihkan sisanya
+    ['symbol','setup','entry','stop','target','exit','note'].forEach(k => $(k).value = '');
+    $('broken').checked = false;
+    $('symbol').focus();
+    preview();
+  });
+
+  $('tbody').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-del]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-del');
+    if (!confirm('Hapus trade ini?')) return;
+    const target = rows.find(r => r.id === id);
+    if (target) { target.deleted = true; target.updatedAt = Date.now(); }
+    save(); render(); scheduleSync();
+  });
+
+  $('btnClear').addEventListener('click', () => {
+    if (!visible().length) return;
+    if (!confirm('Hapus SEMUA trade? Tindakan ini tidak bisa dibatalkan.')) return;
+    const now = Date.now();
+    rows.forEach(r => { if (!r.deleted) { r.deleted = true; r.updatedAt = now; } });
+    save(); render(); scheduleSync();
+  });
+
+  $('btnExport').addEventListener('click', () => {
+    const head = ['date','session','symbol','dir','setup','entry','stop','target','exit','r','risk','broken','note'];
+    const lines = [head.join(',')].concat(visible().map(r => head.map(k => {
+      let v = r[k];
+      if (k === 'broken') v = v ? 'true' : 'false';
+      if (v === null || v === undefined) v = '';
+      const s = String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(',')));
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'journal-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $('btnImport').addEventListener('click', () => $('file').click());
+  $('file').addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    const parsed = parseCSV(text);
+    if (!parsed.length) { $('err').textContent = 'CSV tidak dikenali.'; return; }
+    let added = 0;
+    for (const p of parsed) {
+      const r = calcR(p.dir, p.entry, p.stop, p.exit);
+      rows.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+        date: p.date || '', session: p.session || '', symbol: (p.symbol || '').toUpperCase(),
+        dir: p.dir === 'short' ? 'short' : 'long', setup: p.setup || '',
+        entry: numOrNull(p.entry), stop: numOrNull(p.stop), target: numOrNull(p.target),
+        exit: numOrNull(p.exit), risk: numOrNull(p.risk), r: isFinite(r) ? r : null,
+        broken: /^(true|1|ya|yes)$/i.test(p.broken || ''), note: p.note || '',
+        updatedAt: Date.now(),
+        deleted: false
+      });
+      added++;
+    }
+    save(); render(); scheduleSync(); ev.target.value = '';
+    $('err').textContent = '';
+    alert(added + ' trade diimpor.');
+  });
+
+  function numOrNull(v) { return (v === undefined || v === '' || v === null) ? null : +v; }
+  function parseCSV(text) {
+    const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const parseLine = (line) => {
+      const out = []; let cur = '', q = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (q) {
+          if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+          else if (c === '"') q = false;
+          else cur += c;
+        } else if (c === '"') q = true;
+        else if (c === ',') { out.push(cur); cur = ''; }
+        else cur += c;
+      }
+      out.push(cur);
+      return out;
+    };
+    const head = parseLine(lines[0]).map(h => h.trim().toLowerCase());
+    return lines.slice(1).map(l => {
+      const cells = parseLine(l);
+      const o = {};
+      head.forEach((h, i) => o[h] = (cells[i] ?? '').trim());
+      return o;
+    }).filter(o => o.symbol || o.entry);
+  }
+
+  document.addEventListener('keydown', (ev) => {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') { ev.preventDefault(); $('form').requestSubmit(); }
+    if (ev.key === 'Escape') { $('form').reset(); $('rpreview').textContent = '—'; $('err').textContent = ''; }
+  });
+
+  ['entry','stop','target','exit'].forEach(id => $(id).addEventListener('input', preview));
+  $('dir').addEventListener('change', preview);
+
+  // --- kontrol sinkronisasi ---
+  $('sbUrl').value = cfg.url || '';
+  $('sbKey').value = cfg.key || '';
+
+  $('btnSyncCfg').addEventListener('click', async () => {
+    const url = $('sbUrl').value.trim();
+    const key = $('sbKey').value.trim();
+    if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url) && !/^https?:\/\//.test(url)) {
+      msg('URL tidak valid. Contoh: https://abcd.supabase.co'); return;
+    }
+    if (!key) { msg('Anon key kosong.'); return; }
+    cfg = { url: url.replace(/\/+$/, ''), key };
+    saveCfg();
+    msg('Konfigurasi disimpan. Menguji koneksi…');
+    await syncNow(true);
+  });
+
+  $('btnSyncNow').addEventListener('click', () => syncNow(true));
+
+  $('btnSyncOff').addEventListener('click', () => {
+    cfg = {}; saveCfg();
+    $('sbUrl').value = ''; $('sbKey').value = '';
+    setChip('Lokal', '');
+    msg('Sinkron dimatikan. Data tetap lokal.');
+  });
+
+  if (hasCfg()) {
+    setChip('Sinkron…', 'sync');
+    setTimeout(() => syncNow(false), 300);
+  } else {
+    setChip('Lokal', '');
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && hasCfg()) syncNow(false);
+  });
+
+  const now = new Date();
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  $('date').value = localDate;
+  render(); preview();
+})();
+</script>
+</body>
+</html>
