@@ -328,6 +328,40 @@
     if (who && on) who.textContent = (session.user && session.user.email) || 'masuk';
   }
 
+  // Link konfirmasi Supabase mengembalikan token di URL hash:
+  // #access_token=...&refresh_token=...&expires_at=...&type=signup
+  async function consumeAuthRedirect() {
+    const raw = location.hash && location.hash.length > 1 ? location.hash.slice(1) : '';
+    if (!raw) return false;
+    const p = new URLSearchParams(raw);
+    const err = p.get('error_description') || p.get('error');
+    const at = p.get('access_token');
+    if (!at) {
+      if (err) authMsg('Konfirmasi gagal: ' + err);
+      history.replaceState(null, '', location.pathname + location.search);
+      return false;
+    }
+    const rt = p.get('refresh_token');
+    const exp = p.get('expires_at');
+    saveSession({
+      access_token: at,
+      refresh_token: rt,
+      expires_at: exp ? Number(exp) : Math.floor(Date.now() / 1000) + 3600,
+      user: null
+    });
+    try {
+      const res = await fetch(SB_URL + '/auth/v1/user', {
+        headers: { apikey: SB_KEY, Authorization: 'Bearer ' + at }
+      });
+      if (res.ok) {
+        session.user = await res.json();
+        saveSession(session);
+      }
+    } catch (e) {}
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  }
+
   function mergeRows(a, b) {
     const map = new Map();
     for (const r of [...a, ...b]) {
@@ -712,15 +746,24 @@
   $('btnLogout').addEventListener('click', signOut);
   $('btnSyncNow').addEventListener('click', () => syncNow(true));
 
-  if (isLoggedIn()) {
-    setChip('Sinkron…', 'sync');
-    setTimeout(async () => {
-      try { await ensureSession(); renderAuthUI(); await syncNow(false); }
-      catch (e) { setChip('Login ulang', 'err'); authMsg('Sesi habis: ' + e.message); renderAuthUI(); }
-    }, 300);
-  } else {
-    setChip('Lokal', '');
-  }
+  setChip('Lokal', '');
+  (async () => {
+    const fromLink = await consumeAuthRedirect();
+    renderAuthUI();
+    if (fromLink) authMsg('Email terkonfirmasi. Kamu sudah masuk.');
+    if (isLoggedIn()) {
+      setChip('Sinkron…', 'sync');
+      try {
+        await ensureSession();
+        renderAuthUI();
+        await syncNow(true);
+      } catch (e) {
+        setChip('Login ulang', 'err');
+        authMsg('Sesi habis: ' + e.message);
+        renderAuthUI();
+      }
+    }
+  })();
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && isLoggedIn()) syncNow(false);
